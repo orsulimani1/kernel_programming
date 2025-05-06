@@ -20,10 +20,14 @@ Clone the project repository including all submodules:
 git clone --recursive git@github.com:orsulimani1/kernel_programming.git
 
 # Or if you've already cloned without --recursive
-git clone git@github.com:orsulimani1/kernel_programming.git
-cd kernel_programming/
+
+# Configure Git to use shallow submodules
+git config -f .gitmodules submodule.linux.shallow true
+git config -f .gitmodules submodule.busybox.shallow true
+
+# Initialize and update submodules with depth=1
 git submodule init
-git submodule update
+git submodule update --depth=1
 ```
 
 ## 2. Install Cross Compiler
@@ -31,6 +35,10 @@ git submodule update
 Install the cross compiler (if not already installed):
 
 ```bash
+# Install development packages
+sudo apt-get install build-essential flex bison libssl-dev libelf-dev \
+  libncurses5-dev libncursesw5-dev
+
 # Install the cross compiler on Ubuntu/Debian
 sudo apt-get install gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu
 
