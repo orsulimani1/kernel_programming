@@ -21,10 +21,6 @@ git clone --recursive git@github.com:orsulimani1/kernel_programming.git
 
 # Or if you've already cloned without --recursive
 
-# Configure Git to use shallow submodules
-git config -f .gitmodules submodule.linux.shallow true
-git config -f .gitmodules submodule.busybox.shallow true
-
 # Initialize and update submodules with depth=1
 git submodule init
 git submodule update --depth=1
@@ -42,8 +38,6 @@ sudo apt-get install build-essential flex bison libssl-dev libelf-dev \
 # Install the cross compiler on Ubuntu/Debian
 sudo apt-get install gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu
 
-# Set the cross-compiler environment variable
-export CROSS_COMPILE=x86_64-linux-gnu-
 ```
 
 ## 3. Build the Linux Kernel
@@ -118,8 +112,11 @@ cd /tmp/initramfs
 # Create the basic directory structure
 mkdir -p {bin,sbin,etc,proc,sys,dev,usr/{bin,sbin},root}
 
+
+# set REPO_BASELINE
+# REPO_BASELINE=<path to kernel_programming>
 # Copy the BusyBox binary
-cp kernel_programming/busybox-1.35.0/busybox bin/
+cp ${REPO_BASELINE}/busybox/busybox bin/
 
 # Create essential symlinks
 cd bin
@@ -148,10 +145,10 @@ Create the compressed initramfs image:
 
 ```bash
 # Package the initramfs with a clear filename to avoid confusion
-find . -print0 | cpio --null -ov --format=newc | gzip -9 > ${REPO_BASELINE}/kernel_programming/initramfs.cpio.gz
+find . -print0 | cpio --null -ov --format=newc | gzip -9 > ${REPO_BASELINE}/initramfs.cpio.gz
 
 # Return to the project directory
-cd ${REPO_BASELINE}/kernel_programming
+cd ${REPO_BASELINE}/
 ```
 
 ## 6. Boot with QEMU
@@ -161,10 +158,10 @@ Finally, boot your custom Linux kernel with the initramfs using QEMU:
 ```bash
 # Start QEMU with your kernel and initramfs
 # Make sure to run this command from the kernel_programming directory
-cd ${REPO_BASELINE}kernel_programming
+cd ${REPO_BASELINE}/
 qemu-system-x86_64 \
   -kernel linux/arch/x86/boot/bzImage \
-  -initrd latest_initramfs.cpio.gz \
+  -initrd initramfs.cpio.gz \
   -append "console=ttyS0 nokaslr" \
   -nographic \
   -m 512M
@@ -179,10 +176,3 @@ After booting, you'll see a shell prompt (`/ #`). You can now use the various Bu
 To exit the QEMU session:
 - Press `Ctrl+A` followed by `x`
 
-
-qemu-system-x86_64 \
-  -kernel linux/arch/x86/boot/bzImage \
-  -initrd initramfs.cpio.gz \
-  -append "console=ttyS0 nokaslr" \
-  -nographic \
-  -m 512M
