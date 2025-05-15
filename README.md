@@ -6,7 +6,7 @@ This guide walks through the complete process of building a custom Linux kernel 
 
 - Ubuntu 22.04 (or similar)
 - Git
-- Basic development tools (gcc, make, etc.)
+- Bas   ic development tools (gcc, make, etc.)
 - Approximately 10GB of free disk space
 
 sudo apt-get install build-essential flex bison libssl-dev libelf-dev libncurses5-dev libncursesw5-dev
@@ -72,10 +72,7 @@ BusyBox provides the essential user space utilities:
 # Go to the repository's baseline directory
 cd kernel_programming
 
-# Download BusyBox source
-wget https://busybox.net/downloads/busybox-1.35.0.tar.bz2
-tar xjf busybox-1.35.0.tar.bz2
-cd busybox-1.35.0
+cd busybox
 
 # Install required ncurses libraries if missing
 # sudo apt-get install libncurses5-dev libncursesw5-dev
@@ -156,6 +153,11 @@ cd ${REPO_BASELINE}/
 Finally, boot your custom Linux kernel with the initramfs using QEMU:
 
 ```bash
+# Installation
+sudo apt install virt-manager
+Or
+sudo apt-get install qemu-system-x86 qemu-utils
+
 # Start QEMU with your kernel and initramfs
 # Make sure to run this command from the kernel_programming directory
 cd ${REPO_BASELINE}/
