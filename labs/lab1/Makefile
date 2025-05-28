@@ -1,6 +1,6 @@
 # Targets for individual programs
-# sched_test: sched_test.c
-# 	x86_64-linux-gnu-gcc  $(CFLAGS) -static -o $@ $# Makefile for Lab1 - Process Management
+sched_test: sched_test.c
+	x86_64-linux-gnu-gcc  $(CFLAGS) -static -o $@ $# Makefile for Lab1 - Process Management
 	
 
 # For Linux Kernel Programming course
@@ -28,11 +28,11 @@ modules:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 # Build user space programs
-# programs: $(PROGRAMS)
+programs: $(PROGRAMS)
 
 # Targets for individual programs
-# sched_test: sched_test.c
-# 	$(CC) $(CFLAGS) -o $@ $<
+sched_test: sched_test.c
+	$(CC) $(CFLAGS) -o $@ $<
 
 # Clean up
 clean:
