@@ -56,9 +56,9 @@ Add function declaration to syscalls header:
 asmlinkage long sys_hello_user(const char __user *name, int age);
 ```
 
-## Step 4: Update NR_syscalls
+## Step 4: Updated NR_syscalls
 
-Update the maximum syscall number:
+see if the maximum syscall number is updated:
 
 ```c
 // arch/x86/include/asm/unistd.h
