@@ -1,16 +1,14 @@
 CC = x86_64-linux-gnu-gcc
-
 export CROSS_COMPILE=x86_64-linux-gnu-
 
 KERNEL_SRC=~/course/kernel_programming/linux
 KDIR ?= $(KERNEL_SRC)
 INSTALL_PATH ?= /tmp/initramfs_new
 INITRAMFS_ORIG=~/course/kernel_programming/initramfs.cpio.gz
+obj-m += irq_test.o
 
-obj-m += pos_demo.o
 
-# Build kernel modules
-modules:
+all:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 clean:
@@ -30,34 +28,25 @@ update-initramfs: install
 	cp -r $(INSTALL_PATH)/kernel_modules/* $(INSTALL_PATH)/lib/modules/ 2>/dev/null || true
 	
 	@echo "Creating new initramfs..."
-	cd $(INSTALL_PATH) && find . -print0 | cpio --null -ov --format=newc | gzip -9 > ~/course/kernel_programming/initramfs_class3.cpio.gz
+	cd $(INSTALL_PATH) && find . -print0 | cpio --null -ov --format=newc | gzip -9 > ~/course/kernel_programming/initramfs_interrupt.cpio.gz
 	
-	@echo "New initramfs: ~/course/kernel_programming/initramfs_class3.cpio.gz"
+	@echo "New initramfs: ~/course/kernel_programming/initramfs_interrupt.cpio.gz"
 
 # Test with QEMU
 test-qemu:
 	qemu-system-x86_64 \
 		-kernel $(KDIR)/arch/x86/boot/bzImage \
-		-initrd ~/course/kernel_programming/initramfs_class3.cpio.gz \
+		-initrd ~/course/kernel_programming/initramfs_interrupt.cpio.gz \
 		-append "console=ttyS0 nokaslr" \
 		-nographic \
 		-m 512M
 
 test:
-	# # Load the module
-	# insmod /lib/modules/pos_demo.ko
-	# # Add log entries
-	# echo "First log entry" > /proc/virtual_log
-	# echo "Second log entry" > /proc/virtual_log
-	# echo "Third log entry" > /proc/virtual_log
-	# echo "Fourth log entry" > /proc/virtual_log
-	# # Read all entries (position starts at 0)
-	# cat /proc/virtual_log
-	# # Verify interface created
-	# ls -la /proc/virtual_log
-	# dmesg | tail -5
-	# # # Remove the module
- 	# # rmmod pos_demo
+	sudo insmod irq_test.ko
+	cat /proc/irq_test
+	sleep 5
+	cat /proc/irq_test
+	sudo rmmod irq_test
+	dmesg | tail -10
 
-
-.PHONY: modules clean install remove test-all
+.PHONY: all clean test

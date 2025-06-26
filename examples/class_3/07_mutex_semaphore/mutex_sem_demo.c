@@ -53,7 +53,7 @@ static ssize_t mutex_demo_read(struct file *file, char __user *buffer,
     strncpy(local_msg, shared_message, sizeof(local_msg));
     
     // Simulate work that might sleep
-    msleep(1000);
+    msleep(1000000);
     
     mutex_unlock(&shared_data_mutex);
     pr_info("PID %d released mutex\n", current->pid);
@@ -98,7 +98,7 @@ static ssize_t semaphore_demo_read(struct file *file, char __user *buffer,
             current->pid, my_resource_id, user_count, MAX_RESOURCES);
     
     // Simulate resource usage
-    msleep(2000);
+    msleep(2000000);
     
     len = snprintf(output, sizeof(output),
                    "=== Semaphore Demo ===\n"

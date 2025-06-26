@@ -60,7 +60,7 @@ test-qemu:
 
 test:
 	@echo "Testing netlink interface..."
-	-insmod netlink_example.ko
+	-insmod /lib/modules/netlink_example.ko
 	-./$(USER_PROG)
 	-rmmod netlink_example
 	@echo "Netlink test complete"
