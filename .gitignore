@@ -4,3 +4,4 @@ initramfs.cpio.gz
 .vscode/settings.json
 **.cpio.gz
 **.cmd
+examples/class_5/08_IOCTL/ioctl_app

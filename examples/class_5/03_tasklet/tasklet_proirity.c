@@ -11,6 +11,12 @@ static struct timer_list tasklet_timer;
 static int normal_count = 0, hi_count = 0;
 static struct proc_dir_entry *proc_entry;
 
+
+static bool is_tasklet_scheduled(struct tasklet_struct *t)
+{
+    return test_bit(TASKLET_STATE_SCHED, &t->state);
+}
+
 /* Normal priority tasklet */
 static void normal_tasklet_handler(unsigned long data)
 {
@@ -47,7 +53,7 @@ static void schedule_tasklet_timer(struct timer_list *timer)
     pr_info("TIMER: Normal tasklet scheduled\n");
     
     // Show tasklet states
-    if (tasklet_is_scheduled(&normal_tasklet))
+    if (is_tasklet_scheduled(&normal_tasklet))
         pr_info("TIMER: Normal tasklet is in scheduled state\n");
     
     mod_timer(&tasklet_timer, jiffies + 3 * HZ);
@@ -61,9 +67,9 @@ static int tasklet_proc_show(struct seq_file *m, void *v)
     seq_printf(m, "Hi-priority tasklets: %d\n", hi_count);
     seq_printf(m, "\nTasklet States:\n");
     seq_printf(m, "Normal scheduled: %s\n", 
-               tasklet_is_scheduled(&normal_tasklet) ? "YES" : "NO");
+               is_tasklet_scheduled(&normal_tasklet) ? "YES" : "NO");
     seq_printf(m, "Hi-priority scheduled: %s\n",
-               tasklet_is_scheduled(&hi_tasklet) ? "YES" : "NO");
+               is_tasklet_scheduled(&hi_tasklet) ? "YES" : "NO");
     seq_printf(m, "\nManual control:\n");
     seq_printf(m, "echo 1 > /proc/tasklet_demo  # Schedule normal\n");
     seq_printf(m, "echo 2 > /proc/tasklet_demo  # Schedule hi-priority\n");
@@ -110,7 +116,7 @@ static const struct proc_ops tasklet_proc_ops = {
     .proc_release = single_release,
 };
 
-static int __init tasklet_init(void)
+static int __init demo_tasklet_init(void)
 {
     tasklet_init(&normal_tasklet, normal_tasklet_handler, 0);
     tasklet_init(&hi_tasklet, hi_tasklet_handler, 0);
@@ -124,7 +130,7 @@ static int __init tasklet_init(void)
     return 0;
 }
 
-static void __exit tasklet_exit(void)
+static void __exit demo_tasklet_exit(void)
 {
     del_timer_sync(&tasklet_timer);
     tasklet_kill(&normal_tasklet);
@@ -134,5 +140,5 @@ static void __exit tasklet_exit(void)
 }
 
 MODULE_LICENSE("GPL");
-module_init(tasklet_init);
-module_exit(tasklet_exit);
+module_init(demo_tasklet_init);
+module_exit(demo_tasklet_exit);

@@ -44,12 +44,10 @@ test-qemu:
 
 test:
 	@echo "Testing ..."
-	# Terminal 1: Start multiple readers
-	# View all data structures
-	cat /proc/data_structures
+	insmod basic_timer.ko
 
-	# Check kernel messages
-	dmesg | tail -10
+	# Watch timer execution (fires 5 times)
+	dmesg | grep "Timer fired"
 	@echo " test complete"
 
 .PHONY: all clean install test

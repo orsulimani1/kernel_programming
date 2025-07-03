@@ -44,12 +44,14 @@ test-qemu:
 
 test:
 	@echo "Testing ..."
-	# Terminal 1: Start multiple readers
-	# View all data structures
-	cat /proc/data_structures
+	insmod work_queues.ko
 
-	# Check kernel messages
-	dmesg | tail -10
+	# Monitor work queue execution
+	cat /proc/work_demo
+	dmesg | grep -E "WORK:|DELAYED WORK:"
+
+	# Shows process context capabilities
+	dmesg | grep "Can sleep"
 	@echo " test complete"
 
 .PHONY: all clean install test

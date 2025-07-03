@@ -44,12 +44,13 @@ test-qemu:
 
 test:
 	@echo "Testing ..."
-	# Terminal 1: Start multiple readers
-	# View all data structures
-	cat /proc/data_structures
+	insmod jiffies_conversions.ko
 
-	# Check kernel messages
-	dmesg | tail -10
+	# View time conversions and statistics
+	cat /proc/time_demo
+
+	# Monitor uptime calculations
+	watch -n 1 'cat /proc/time_demo | grep -A5 "Current Values"'
 	@echo " test complete"
 
 .PHONY: all clean install test

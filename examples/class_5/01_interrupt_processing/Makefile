@@ -44,12 +44,12 @@ test-qemu:
 
 test:
 	@echo "Testing ..."
-	# Terminal 1: Start multiple readers
-	# View all data structures
-	cat /proc/data_structures
+	make KDIR=../../linux
+	insmod interrupt_processing.ko
 
-	# Check kernel messages
-	dmesg | tail -10
+	# Monitor timing differences
+	cat /proc/top_bottom_demo
+	dmesg | grep -E "(TOP-HALF|BOTTOM-HALF)"
 	@echo " test complete"
 
 .PHONY: all clean install test

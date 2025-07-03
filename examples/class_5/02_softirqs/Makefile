@@ -44,12 +44,14 @@ test-qemu:
 
 test:
 	@echo "Testing ..."
-	# Terminal 1: Start multiple readers
-	# View all data structures
-	cat /proc/data_structures
+	insmod raising_softirqs.ko
 
-	# Check kernel messages
-	dmesg | tail -10
+	# Monitor softirq activity
+	cat /proc/softirq_demo
+	cat /proc/softirqs | head -5
+
+	# Watch real-time softirq counts
+	watch -n 1 'cat /proc/softirqs'
 	@echo " test complete"
 
 .PHONY: all clean install test

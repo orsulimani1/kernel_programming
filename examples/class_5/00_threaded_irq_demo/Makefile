@@ -44,12 +44,17 @@ test-qemu:
 
 test:
 	@echo "Testing ..."
-	# Terminal 1: Start multiple readers
-	# View all data structures
-	cat /proc/data_structures
+	insmod threaded_irq_demo.ko
 
-	# Check kernel messages
-	dmesg | tail -10
+	# View status and capabilities
+	cat /proc/advanced_threaded_irq_demo
+
+	# Trigger manual interrupts
+	echo 1 > /proc/advanced_threaded_irq_demo  # Primary handler only
+	echo 2 > /proc/advanced_threaded_irq_demo  # Full threaded IRQ
+
+	# Monitor context differences
+	dmesg | tail -20
 	@echo " test complete"
 
 .PHONY: all clean install test

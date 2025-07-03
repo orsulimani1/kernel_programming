@@ -69,7 +69,7 @@ static const struct proc_ops softirq_proc_ops = {
     .proc_release = single_release,
 };
 
-static int __init softirq_init(void)
+static int __init demo_softirq_init(void)
 {
     timer_setup(&softirq_timer, raise_softirq_timer, 0);
     mod_timer(&softirq_timer, jiffies + HZ);
@@ -81,7 +81,7 @@ static int __init softirq_init(void)
     return 0;
 }
 
-static void __exit softirq_exit(void)
+static void __exit demo_softirq_exit(void)
 {
     del_timer_sync(&softirq_timer);
     proc_remove(proc_entry);
@@ -89,5 +89,5 @@ static void __exit softirq_exit(void)
 }
 
 MODULE_LICENSE("GPL");
-module_init(softirq_init);
-module_exit(softirq_exit);
+module_init(demo_softirq_init);
+module_exit(demo_softirq_exit);

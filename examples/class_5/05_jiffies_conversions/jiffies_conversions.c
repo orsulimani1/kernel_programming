@@ -56,7 +56,7 @@ static int time_proc_show(struct seq_file *m, void *v)
     seq_printf(m, "\nTime Conversions:\n");
     seq_printf(m, "Uptime in ms: %u\n", jiffies_to_msecs(uptime_jiffies));
     seq_printf(m, "Uptime in seconds: %u\n", jiffies_to_msecs(uptime_jiffies) / 1000);
-    seq_printf(m, "1 second = %lu jiffies\n", HZ);
+    seq_printf(m, "1 second = %u jiffies\n", HZ);
     seq_printf(m, "100ms = %lu jiffies\n", msecs_to_jiffies(100));
     seq_printf(m, "1000μs = %lu jiffies\n", usecs_to_jiffies(1000));
     
@@ -68,7 +68,7 @@ static int time_proc_show(struct seq_file *m, void *v)
     seq_printf(m, "Timer fires: %d\n", timer_fires);
     
     // Demonstrate overflow-safe comparisons
-    unsigned long future = current_jiffies + 100;
+    unsigned long future = (unsigned long )current_jiffies + 100;
     seq_printf(m, "\nTime Comparison Demo:\n");
     seq_printf(m, "time_after(future, now): %s\n",
                time_after(future, current_jiffies) ? "true" : "false");

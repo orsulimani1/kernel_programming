@@ -44,12 +44,17 @@ test-qemu:
 
 test:
 	@echo "Testing ..."
-	# Terminal 1: Start multiple readers
-	# View all data structures
-	cat /proc/data_structures
+	insmod tasklet_proirity.ko
 
-	# Check kernel messages
-	dmesg | tail -10
+	# View tasklet statistics
+	cat /proc/tasklet_demo
+
+	# Manual tasklet scheduling
+	echo 1 > /proc/tasklet_demo  # Schedule normal priority
+	echo 2 > /proc/tasklet_demo  # Schedule high priority
+
+	# Monitor execution order
+	dmesg | grep -E "(NORMAL|HI-PRIORITY) TASKLET"
 	@echo " test complete"
 
 .PHONY: all clean install test

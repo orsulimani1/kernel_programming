@@ -5,6 +5,8 @@
 #include <linux/ktime.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/delay.h>
+
 
 static struct work_struct bottom_half_work;
 static struct timer_list irq_simulator;

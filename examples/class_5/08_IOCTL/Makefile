@@ -8,18 +8,18 @@ INITRAMFS_ORIG=~/course/kernel_programming/initramfs.cpio.gz
 CFLAGS = -m32 -Wall -Wextra -g
 
 
-obj-m += timer_implementation.o
+obj-m += ioctl_test.o
 
 # User space program
-USER_PROG = ioctl_demo
+USER_PROG = ioctl_app
 
 all: modules $(USER_PROG)
 
 modules:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
-$(USER_PROG): ioctl_demo.c
-	$(CC) -o $(USER_PROG) ioctl_demo.c
+$(USER_PROG): ioctl_app.c
+	$(CC) -o $(USER_PROG) ioctl_app.c
 
 
 clean:
@@ -60,6 +60,21 @@ test-qemu:
 		-m 512M
 
 test:
+	@echo "Testing ..."
+
+	insmod timer_implementation.ko
+
+	# Create device node (if not auto-created)
+	mknod /dev/ioctl_demo c MAJOR_NUM 0
+
+	# Test IOCTL operations
+	./ioctl_demo set_value 42
+	./ioctl_demo get_value
+	./ioctl_demo set_string "Hello Kernel"
+	./ioctl_demo get_string
+	./ioctl_demo test_all
+	@echo " test complete"
+
 
 .PHONY: all clean install test
 
