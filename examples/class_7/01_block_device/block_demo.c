@@ -1,3 +1,4 @@
+// simple_block.c - Block Device with bio and I/O Vectors Example for Linux 5.15
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
@@ -38,14 +39,17 @@ static void simple_transfer(struct simple_block_dev *dev, sector_t sector,
         return;
     }
     
-    if (write)
+    if (write) {
         memcpy(dev->data + offset, buffer, nbytes);
-    else
+        pr_info("simple_block: Wrote %ld bytes at offset %ld\n", nbytes, offset);
+    } else {
         memcpy(buffer, dev->data + offset, nbytes);
+        pr_info("simple_block: Read %ld bytes at offset %ld\n", nbytes, offset);
+    }
 }
 
 // Handle bio requests with I/O vectors
-static void simple_handle_bio(struct bio *bio)
+static blk_status_t simple_handle_bio(struct bio *bio)
 {
     struct simple_block_dev *dev = bio->bi_bdev->bd_disk->private_data;
     struct bio_vec bvec;
@@ -73,7 +77,7 @@ static void simple_handle_bio(struct bio *bio)
         sector += bvec.bv_len / KERNEL_SECTOR_SIZE;
     }
     
-    bio_endio(bio);
+    return BLK_STS_OK;
 }
 
 // Multi-queue block driver queue function
@@ -82,32 +86,35 @@ static blk_status_t simple_queue_rq(struct blk_mq_hw_ctx *hctx,
 {
     struct request *req = bd->rq;
     struct bio *bio;
+    blk_status_t status = BLK_STS_OK;
     
     blk_mq_start_request(req);
     
     // Process all bio structures in the request
     __rq_for_each_bio(bio, req) {
-        simple_handle_bio(bio);
+        status = simple_handle_bio(bio);
+        if (status != BLK_STS_OK)
+            break;
     }
     
-    blk_mq_end_request(req, BLK_STS_OK);
-    return BLK_STS_OK;
+    blk_mq_end_request(req, status);
+    return status;
 }
 
 // Block device operations
-static int simple_open(struct block_device *bdev, fmode_t mode)
+static int example_block_open(struct block_device *bdev, fmode_t mode)
 {
     pr_info("simple_block: Device opened\n");
     return 0;
 }
 
-static void simple_release(struct gendisk *disk, fmode_t mode)
+static void example_block_release(struct gendisk *disk, fmode_t mode)
 {
     pr_info("simple_block: Device released\n");
 }
 
-static int simple_ioctl(struct block_device *bdev, fmode_t mode,
-                       unsigned int cmd, unsigned long arg)
+static int example_block_ioctl(struct block_device *bdev, fmode_t mode,
+                              unsigned int cmd, unsigned long arg)
 {
     pr_info("simple_block: ioctl called with cmd: %u\n", cmd);
     return -ENOTTY;
@@ -116,9 +123,9 @@ static int simple_ioctl(struct block_device *bdev, fmode_t mode,
 // Block device operations structure
 static const struct block_device_operations simple_ops = {
     .owner      = THIS_MODULE,
-    .open       = simple_open,
-    .release    = simple_release,
-    .ioctl      = simple_ioctl
+    .open       = example_block_open,
+    .release    = example_block_release,
+    .ioctl      = example_block_ioctl
 };
 
 // Multi-queue operations
@@ -129,6 +136,8 @@ static const struct blk_mq_ops simple_mq_ops = {
 static int __init simple_block_init(void)
 {
     int ret;
+    
+    pr_info("simple_block: Initializing block device\n");
     
     // Allocate device structure
     Device = kzalloc(sizeof(struct simple_block_dev), GFP_KERNEL);
@@ -145,15 +154,19 @@ static int __init simple_block_init(void)
     
     // Initialize device data with pattern
     memset(Device->data, 0xAA, Device->size);
+    pr_info("simple_block: Allocated %d bytes of storage\n", Device->size);
     
     // Register block device
     major_num = register_blkdev(0, "simple_block");
     if (major_num < 0) {
         ret = major_num;
+        pr_err("simple_block: Failed to register block device\n");
         goto out_free_data;
     }
+    pr_info("simple_block: Registered with major number %d\n", major_num);
     
     // Initialize tag set for multi-queue
+    memset(&Device->tag_set, 0, sizeof(Device->tag_set));
     Device->tag_set.ops = &simple_mq_ops;
     Device->tag_set.nr_hw_queues = 1;
     Device->tag_set.queue_depth = 128;
@@ -163,25 +176,17 @@ static int __init simple_block_init(void)
     Device->tag_set.driver_data = Device;
     
     ret = blk_mq_alloc_tag_set(&Device->tag_set);
-    if (ret)
+    if (ret) {
+        pr_err("simple_block: Failed to allocate tag set\n");
         goto out_unreg_blk;
-    
-    // Allocate request queue
-    Device->queue = blk_mq_init_queue(&Device->tag_set);
-    if (IS_ERR(Device->queue)) {
-        ret = PTR_ERR(Device->queue);
-        goto out_free_tag_set;
     }
     
-    // Set queue properties
-    blk_queue_logical_block_size(Device->queue, KERNEL_SECTOR_SIZE);
-    Device->queue->queuedata = Device;
-    
-    // Allocate and configure gendisk
+    // Allocate gendisk
     Device->gd = blk_mq_alloc_disk(&Device->tag_set, Device);
     if (IS_ERR(Device->gd)) {
         ret = PTR_ERR(Device->gd);
-        goto out_free_queue;
+        pr_err("simple_block: Failed to allocate disk\n");
+        goto out_free_tag_set;
     }
     
     Device->gd->major = major_num;
@@ -191,23 +196,28 @@ static int __init simple_block_init(void)
     Device->gd->private_data = Device;
     strcpy(Device->gd->disk_name, "simple_block");
     
+    // Set queue properties
+    Device->queue = Device->gd->queue;
+    blk_queue_logical_block_size(Device->queue, KERNEL_SECTOR_SIZE);
+    blk_queue_physical_block_size(Device->queue, KERNEL_SECTOR_SIZE);
+    
     set_capacity(Device->gd, SIMPLE_BLOCK_SIZE / KERNEL_SECTOR_SIZE);
     
     // Add disk to system
     ret = add_disk(Device->gd);
-    if (ret)
+    if (ret) {
+        pr_err("simple_block: Failed to add disk\n");
         goto out_cleanup_disk;
+    }
     
-    pr_info("simple_block: Registered device with major number %d\n", major_num);
     pr_info("simple_block: Device size: %d bytes (%d sectors)\n",
             Device->size, Device->size / KERNEL_SECTOR_SIZE);
+    pr_info("simple_block: Device /dev/%s created successfully\n", Device->gd->disk_name);
     
     return 0;
     
 out_cleanup_disk:
     put_disk(Device->gd);
-out_free_queue:
-    blk_cleanup_queue(Device->queue);
 out_free_tag_set:
     blk_mq_free_tag_set(&Device->tag_set);
 out_unreg_blk:
@@ -216,6 +226,7 @@ out_free_data:
     vfree(Device->data);
 out_free_dev:
     kfree(Device);
+    Device = NULL;
     return ret;
 }
 
@@ -224,11 +235,11 @@ static void __exit simple_block_exit(void)
     if (Device) {
         del_gendisk(Device->gd);
         put_disk(Device->gd);
-        blk_cleanup_queue(Device->queue);
         blk_mq_free_tag_set(&Device->tag_set);
         unregister_blkdev(major_num, "simple_block");
         vfree(Device->data);
         kfree(Device);
+        Device = NULL;
     }
     
     pr_info("simple_block: Module unloaded\n");

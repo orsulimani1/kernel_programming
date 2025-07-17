@@ -5,86 +5,97 @@
 #include <linux/init.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/statfs.h>
 
 #define SIMPLE_MAGIC 0x19980122
 
 // Forward declarations
-static struct inode *simple_alloc_inode(struct super_block *sb);
-static void simple_destroy_inode(struct inode *inode);
-static int simple_statfs(struct dentry *dentry, struct kstatfs *buf);
+static struct inode *example_alloc_inode(struct super_block *sb);
+static void example_destroy_inode(struct inode *inode);
+static int example_statfs(struct dentry *dentry, struct kstatfs *buf);
 
 // 1. Superblock Operations
-static const struct super_operations simple_super_ops = {
-    .alloc_inode    = simple_alloc_inode,
-    .destroy_inode  = simple_destroy_inode,
-    .statfs         = simple_statfs,
+static const struct super_operations example_super_ops = {
+    .alloc_inode    = example_alloc_inode,
+    .destroy_inode  = example_destroy_inode,
+    .statfs         = example_statfs,
 };
 
 // Simple inode structure
-struct simple_inode_info {
+struct example_inode_info {
     struct inode vfs_inode;
     char data[64];  // Simple data storage
 };
 
-// 2. Inode Operations
-static struct dentry *simple_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags);
-static int simple_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl);
-static int simple_unlink(struct inode *dir, struct dentry *dentry);
+// Forward declarations for inode operations
+static struct dentry *example_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags);
+static int example_create(struct user_namespace *mnt_userns, struct inode *dir, 
+                         struct dentry *dentry, umode_t mode, bool excl);
+static int example_unlink(struct inode *dir, struct dentry *dentry);
 
-static const struct inode_operations simple_dir_inode_ops = {
-    .lookup = simple_lookup,
-    .create = simple_create,
-    .unlink = simple_unlink,
+// Forward declarations for file operations
+static ssize_t example_read(struct file *file, char __user *buf, size_t count, loff_t *ppos);
+static ssize_t example_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
+static int example_open(struct inode *inode, struct file *file);
+static int example_readdir(struct file *file, struct dir_context *ctx);
+
+// 2. Inode Operations
+static const struct inode_operations example_dir_inode_ops = {
+    .lookup = example_lookup,
+    .create = example_create,
+    .unlink = example_unlink,
+};
+
+static const struct inode_operations example_file_inode_ops = {
+    // Simple file inode operations - can be empty for basic functionality
 };
 
 // 3. File Operations
-static ssize_t simple_read(struct file *file, char __user *buf, size_t count, loff_t *ppos);
-static ssize_t simple_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos);
-static int simple_open(struct inode *inode, struct file *file);
-
-static const struct file_operations simple_file_ops = {
-    .open    = simple_open,
-    .read    = simple_read,
-    .write   = simple_write,
+static const struct file_operations example_file_ops = {
+    .open    = example_open,
+    .read    = example_read,
+    .write   = example_write,
     .llseek  = default_llseek,
 };
 
 // Directory file operations
-static int simple_readdir(struct file *file, struct dir_context *ctx);
-
-static const struct file_operations simple_dir_ops = {
+static const struct file_operations example_dir_ops = {
     .open       = dcache_dir_open,
     .release    = dcache_dir_close,
     .llseek     = dcache_dir_lseek,
     .read       = generic_read_dir,
-    .iterate    = simple_readdir,
+    .iterate    = example_readdir,
 };
 
-// Helper function to get simple_inode_info from inode
-static inline struct simple_inode_info *SIMPLE_I(struct inode *inode)
+// Helper function to get example_inode_info from inode
+static inline struct example_inode_info *EXAMPLE_I(struct inode *inode)
 {
-    return container_of(inode, struct simple_inode_info, vfs_inode);
+    return container_of(inode, struct example_inode_info, vfs_inode);
 }
 
 // Superblock Operations Implementation
-static struct inode *simple_alloc_inode(struct super_block *sb)
+static struct inode *example_alloc_inode(struct super_block *sb)
 {
-    struct simple_inode_info *ei;
+    struct example_inode_info *ei;
     
-    ei = kmalloc(sizeof(struct simple_inode_info), GFP_KERNEL);
+    ei = kmalloc(sizeof(struct example_inode_info), GFP_KERNEL);
     if (!ei)
         return NULL;
     
     memset(ei->data, 0, sizeof(ei->data));
+    
+    // Initialize the VFS inode properly
+    inode_init_once(&ei->vfs_inode);
+    
     return &ei->vfs_inode;
 }
 
-static void simple_destroy_inode(struct inode *inode)
+static void example_destroy_inode(struct inode *inode)
 {
-    kfree(SIMPLE_I(inode));
+    kfree(EXAMPLE_I(inode));
 }
 
-static int simple_statfs(struct dentry *dentry, struct kstatfs *buf)
+static int example_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
     buf->f_type = SIMPLE_MAGIC;
     buf->f_bsize = PAGE_SIZE;
@@ -98,7 +109,7 @@ static int simple_statfs(struct dentry *dentry, struct kstatfs *buf)
 }
 
 // Inode Operations Implementation
-static struct inode *simple_get_inode(struct super_block *sb, umode_t mode)
+static struct inode *example_get_inode(struct super_block *sb, umode_t mode)
 {
     struct inode *inode = new_inode(sb);
     
@@ -109,14 +120,17 @@ static struct inode *simple_get_inode(struct super_block *sb, umode_t mode)
         inode->i_gid = current_fsgid();
         inode->i_atime = inode->i_mtime = inode->i_ctime = current_time(inode);
         
+        // Initialize i_mapping properly
+        inode->i_mapping->a_ops = &empty_aops;
+        
         switch (mode & S_IFMT) {
         case S_IFREG:
-            inode->i_op = &simple_page_symlink_inode_operations;
-            inode->i_fop = &simple_file_ops;
+            inode->i_op = &example_file_inode_ops;
+            inode->i_fop = &example_file_ops;
             break;
         case S_IFDIR:
-            inode->i_op = &simple_dir_inode_ops;
-            inode->i_fop = &simple_dir_ops;
+            inode->i_op = &example_dir_inode_ops;
+            inode->i_fop = &example_dir_ops;
             inc_nlink(inode);
             break;
         }
@@ -124,11 +138,13 @@ static struct inode *simple_get_inode(struct super_block *sb, umode_t mode)
     return inode;
 }
 
-static struct dentry *simple_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
+static struct dentry *example_lookup(struct inode *dir, struct dentry *dentry, unsigned int flags)
 {
+    pr_info("example_vfs: lookup called for '%s'\n", dentry->d_name.name);
+    
     // For demonstration, we'll create a simple file on lookup
     if (strcmp(dentry->d_name.name, "testfile") == 0) {
-        struct inode *inode = simple_get_inode(dir->i_sb, S_IFREG | 0644);
+        struct inode *inode = example_get_inode(dir->i_sb, S_IFREG | 0644);
         if (inode) {
             d_add(dentry, inode);
             return NULL;
@@ -140,10 +156,14 @@ static struct dentry *simple_lookup(struct inode *dir, struct dentry *dentry, un
     return NULL;
 }
 
-static int simple_create(struct inode *dir, struct dentry *dentry, umode_t mode, bool excl)
+static int example_create(struct user_namespace *mnt_userns, struct inode *dir, 
+                         struct dentry *dentry, umode_t mode, bool excl)
 {
-    struct inode *inode = simple_get_inode(dir->i_sb, mode | S_IFREG);
+    struct inode *inode;
     
+    pr_info("example_vfs: create called for '%s'\n", dentry->d_name.name);
+    
+    inode = example_get_inode(dir->i_sb, mode | S_IFREG);
     if (!inode)
         return -ENOSPC;
     
@@ -154,9 +174,11 @@ static int simple_create(struct inode *dir, struct dentry *dentry, umode_t mode,
     return 0;
 }
 
-static int simple_unlink(struct inode *dir, struct dentry *dentry)
+static int example_unlink(struct inode *dir, struct dentry *dentry)
 {
     struct inode *inode = d_inode(dentry);
+    
+    pr_info("example_vfs: unlink called for '%s'\n", dentry->d_name.name);
     
     inode->i_ctime = dir->i_ctime = dir->i_mtime = current_time(inode);
     drop_nlink(inode);
@@ -166,17 +188,19 @@ static int simple_unlink(struct inode *dir, struct dentry *dentry)
 }
 
 // File Operations Implementation
-static int simple_open(struct inode *inode, struct file *file)
+static int example_open(struct inode *inode, struct file *file)
 {
-    pr_info("simple_vfs: File opened\n");
+    pr_info("example_vfs: File opened\n");
     return 0;
 }
 
-static ssize_t simple_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
+static ssize_t example_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
     struct inode *inode = file_inode(file);
-    struct simple_inode_info *ei = SIMPLE_I(inode);
+    struct example_inode_info *ei = EXAMPLE_I(inode);
     size_t len = strlen(ei->data);
+    
+    pr_info("example_vfs: read called, pos=%lld, count=%zu\n", *ppos, count);
     
     if (*ppos >= len)
         return 0;
@@ -191,10 +215,12 @@ static ssize_t simple_read(struct file *file, char __user *buf, size_t count, lo
     return count;
 }
 
-static ssize_t simple_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
+static ssize_t example_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos)
 {
     struct inode *inode = file_inode(file);
-    struct simple_inode_info *ei = SIMPLE_I(inode);
+    struct example_inode_info *ei = EXAMPLE_I(inode);
+    
+    pr_info("example_vfs: write called, pos=%lld, count=%zu\n", *ppos, count);
     
     if (count > sizeof(ei->data) - 1)
         count = sizeof(ei->data) - 1;
@@ -209,8 +235,10 @@ static ssize_t simple_write(struct file *file, const char __user *buf, size_t co
 }
 
 // Directory Operations Implementation
-static int simple_readdir(struct file *file, struct dir_context *ctx)
+static int example_readdir(struct file *file, struct dir_context *ctx)
 {
+    pr_info("example_vfs: readdir called, pos=%lld\n", ctx->pos);
+    
     if (ctx->pos == 0) {
         if (!dir_emit_dot(file, ctx))
             return 0;
@@ -233,16 +261,19 @@ static int simple_readdir(struct file *file, struct dir_context *ctx)
 }
 
 // Filesystem mount and unmount
-static int simple_fill_super(struct super_block *sb, void *data, int silent)
+static int example_fill_super(struct super_block *sb, void *data, int silent)
 {
     struct inode *root;
+    
+    pr_info("example_vfs: fill_super called\n");
     
     sb->s_blocksize = PAGE_SIZE;
     sb->s_blocksize_bits = PAGE_SHIFT;
     sb->s_magic = SIMPLE_MAGIC;
-    sb->s_op = &simple_super_ops;
+    sb->s_op = &example_super_ops;
+    sb->s_time_gran = 1;
     
-    root = simple_get_inode(sb, S_IFDIR | 0755);
+    root = example_get_inode(sb, S_IFDIR | 0755);
     if (!root)
         return -ENOMEM;
     
@@ -250,43 +281,45 @@ static int simple_fill_super(struct super_block *sb, void *data, int silent)
     if (!sb->s_root)
         return -ENOMEM;
     
+    pr_info("example_vfs: superblock created successfully\n");
     return 0;
 }
 
-static struct dentry *simple_mount(struct file_system_type *fs_type, int flags,
-                                  const char *dev_name, void *data)
+static struct dentry *example_mount(struct file_system_type *fs_type, int flags,
+                                   const char *dev_name, void *data)
 {
-    return mount_nodev(fs_type, flags, data, simple_fill_super);
+    pr_info("example_vfs: mount called\n");
+    return mount_nodev(fs_type, flags, data, example_fill_super);
 }
 
-static struct file_system_type simple_fs_type = {
+static struct file_system_type example_fs_type = {
     .owner      = THIS_MODULE,
-    .name       = "simple_vfs",
-    .mount      = simple_mount,
+    .name       = "example_vfs",
+    .mount      = example_mount,
     .kill_sb    = kill_litter_super,
 };
 
-static int __init simple_vfs_init(void)
+static int __init example_vfs_init(void)
 {
-    int ret = register_filesystem(&simple_fs_type);
+    int ret = register_filesystem(&example_fs_type);
     if (ret)
-        pr_err("simple_vfs: Failed to register filesystem\n");
+        pr_err("example_vfs: Failed to register filesystem\n");
     else
-        pr_info("simple_vfs: Filesystem registered\n");
+        pr_info("example_vfs: Filesystem registered\n");
     
     return ret;
 }
 
-static void __exit simple_vfs_exit(void)
+static void __exit example_vfs_exit(void)
 {
-    unregister_filesystem(&simple_fs_type);
-    pr_info("simple_vfs: Filesystem unregistered\n");
+    unregister_filesystem(&example_fs_type);
+    pr_info("example_vfs: Filesystem unregistered\n");
 }
 
-module_init(simple_vfs_init);
-module_exit(simple_vfs_exit);
+module_init(example_vfs_init);
+module_exit(example_vfs_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kernel Programming Course");
-MODULE_DESCRIPTION("Simple VFS Objects Example");
+MODULE_DESCRIPTION("VFS Objects Example");
 MODULE_VERSION("1.0");
